@@ -1,4 +1,3 @@
-using CompaniesHouseResilience.Services;
 using CompaniesHouseResilience.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

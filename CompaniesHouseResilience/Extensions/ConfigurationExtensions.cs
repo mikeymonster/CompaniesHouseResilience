@@ -6,15 +6,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using System.Net.Http.Headers;
 using Polly;
-using Polly.Extensions.Http;
 using Polly.Timeout;
 using CompaniesHouseResilience.Resilience;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Http.Resilience;
 using Polly.Retry;
 using System.Net;
-using System.Security.Cryptography;
-using System;
 
 namespace CompaniesHouseResilience.Extensions;
 public static class ConfigurationExtensions
@@ -37,8 +34,8 @@ public static class ConfigurationExtensions
             // .AddPolicyHandler((services, _) => GetRetryPolicy<CompaniesHouseLookupDirectService>(services))
             // .AddPolicyHandler((services, _) => GetTimeoutPolicy(services))
             //.AddResiliencePipelineHandler(PollyResilienceStrategy.Retry())
-            .AddResilienceHandler(PollyResilienceStrategy.CompaniesHouseResiliencePipelineKey, ConfigureCompaniesHouseResilienceHandler<CompaniesHouseLookupService>())
-        ;
+            //.AddResilienceHandler(PollyResilienceStrategies.CompaniesHouseResiliencePipelineKey, PollyResilienceStrategies.ConfigureCompaniesHouseResilienceHandler<CompaniesHouseLookupService>())
+            .AddCompaniesHouseResilienceHandler();
         return services;
     }
 
@@ -71,7 +68,7 @@ public static class ConfigurationExtensions
                     var logger = context.ServiceProvider.GetRequiredService<ILogger>();
 
                     logger.LogWarning(
-                            "Resilience pililine startege will attempt retry {Retry} in {Delay}ms after a transient error or timeout. {ExceptionMessage}",
+                            "Resilience pipeline startegy will attempt retry {Retry} in {Delay}ms after a transient error or timeout. {ExceptionMessage}",
                             args.AttemptNumber,
                             args.RetryDelay.TotalMilliseconds,
                             args.Outcome.Exception?.Message);
@@ -140,22 +137,18 @@ public static class ConfigurationExtensions
     {
         return (builder, context) =>
         {
-            var apiOptions = context.ServiceProvider.GetRequiredService<IOptions<ApiOptions>>().Value;
-
-            // Better way?
-            var options = context.GetOptions<ApiOptions>();
+            var apiOptions = context.GetOptions<ApiOptions>();
 
             builder.AddRetry(new HttpRetryStrategyOptions
             {
-                Delay = TimeSpan.FromSeconds(options.RetryPolicyInitialWaitTime),
+                Delay = TimeSpan.FromSeconds(apiOptions.RetryPolicyInitialWaitTime),
                 BackoffType = DelayBackoffType.Exponential,
-                MaxRetryAttempts = options.RetryPolicyMaxRetries,
+                MaxRetryAttempts = apiOptions.RetryPolicyMaxRetries,
                 UseJitter = true,
                 OnRetry = args =>
                 {
-                    var logger = context.ServiceProvider.GetRequiredService<ILogger>();
-
-                    logger.LogWarning(
+                    var logger = context.ServiceProvider.GetService<ILogger<T>>();
+                    logger?.LogWarning(
                             "{Type} retry policy will attempt retry {Retry} in {Delay}ms after a transient error or timeout. {ExceptionMessage}",
                             typeof(T).Name,
                             args.AttemptNumber,
@@ -164,7 +157,7 @@ public static class ConfigurationExtensions
 
                     if (args.Outcome.Exception is TimeoutException)
                     {
-                        logger.LogInformation("Timeout encountered");
+                        logger?.LogInformation("Timeout encountered");
                     }
 
                     return default;
@@ -179,14 +172,14 @@ public static class ConfigurationExtensions
             {
                 ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
                     .HandleResult(response => response.StatusCode == HttpStatusCode.TooManyRequests),
-                Delay = TimeSpan.FromSeconds(options.RetryPolicyTooManyAttemptsWaitTime),
-                MaxRetryAttempts = options.RetryPolicyMaxRetries,
+                Delay = TimeSpan.FromSeconds(apiOptions.RetryPolicyTooManyAttemptsWaitTime),
+                MaxRetryAttempts = apiOptions.RetryPolicyMaxRetries,
                 UseJitter = true,
                 BackoffType = DelayBackoffType.Exponential,
                 OnRetry = args =>
                 {
-                    var logger = context.ServiceProvider.GetRequiredService<ILogger>();
-                    logger.LogWarning(
+                    context.ServiceProvider.GetService<ILogger<T>>()?
+                        .LogWarning(
                             "{Type} retry policy will attempt retry {Retry} in {Delay}ms after a 429 error. {ExceptionMessage}",
                             typeof(T).Name,
                             args.AttemptNumber,

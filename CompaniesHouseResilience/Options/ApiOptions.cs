@@ -13,4 +13,18 @@ public record ApiOptions
     public int RetryPolicyTooManyAttemptsWaitTime { get; set; }
 
     public int Timeout { get; set; }
+
+    public TimeUnit TimeUnits { get; set; }
+
+    /*
+    public static int ConvertTimeToMilliseconds(this ApiOptions apiOptions, int time)
+    {
+        return apiOptions.TimeUnit switch
+        {
+            TimeUnit.Seconds => time * 1000,
+            TimeUnit.Milliseconds => time,
+            _ => throw new NotImplementedException()
+        };
+    }
+    */
 }
