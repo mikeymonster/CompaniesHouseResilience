@@ -68,7 +68,7 @@ public static class ConfigurationExtensions
                     var logger = context.ServiceProvider.GetRequiredService<ILogger>();
 
                     logger.LogWarning(
-                            "Resilience pipeline startegy will attempt retry {Retry} in {Delay}ms after a transient error or timeout. {ExceptionMessage}",
+                            "Resilience pipeline strategy will attempt retry {Retry} in {Delay}ms after a transient error or timeout. {ExceptionMessage}",
                             args.AttemptNumber,
                             args.RetryDelay.TotalMilliseconds,
                             args.Outcome.Exception?.Message);
